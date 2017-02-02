@@ -4,11 +4,11 @@ import shutil
 
 import subprocess
 
-from torchaudio import SpectrogramDataset
+from .. import data
 from torchaudio.utils import create_manifest
 
 
-class AN4(SpectrogramDataset):
+class AN4(data.SpectrogramDataset):
     def __init__(self, audio_conf, labels, normalize=False, classes='train', dataset_path='./an4_dataset'):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by

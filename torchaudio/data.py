@@ -82,7 +82,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             with open(manifest_filepath) as f:
                 ids = f.readlines()
             ids = [x.strip().split(',') for x in ids]
-            self.ids = ids
+        self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
 
