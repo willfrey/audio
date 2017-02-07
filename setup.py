@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 readme = open('README.md').read()
 
@@ -8,17 +8,19 @@ VERSION = '0.1.0'
 # same as ./requirements.txt
 requirements = [
     'librosa',
-    'torch',
+    'six',
+    'torch'
 ]
 
 setup(
     # Metadata
     name='torchaudio',
     version=VERSION,
-    author='PyTorch core devs and Sean Naren',
-    author_email='sean.narenthiran@digitalreasoning.com',
+    author='PyTorch Core Team, Sean Naren, Will Frey',
+    author_email=('sean.narenthiran@digitalreasoning.com, '
+                  'will.frey@digitalreasoning.com'),
     url='https://github.com/pytorch/audio',
-    description='Audio utilities and datasets for torch deep learning',
+    description='audio utilities and datasets for torch deep learning',
     long_description=readme,
     license='BSD',
 

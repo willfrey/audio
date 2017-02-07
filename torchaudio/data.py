@@ -1,137 +1,78 @@
+"""Generic audio datasets and helper functions."""
+from __future__ import print_function
+
+import os
+import os.path
+
 import librosa
-import numpy as np
-import scipy.signal
-import torch
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-
-windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
-           'bartlett': scipy.signal.bartlett}
+import torch.utils.data
 
 
-class AudioParser(object):
-    def parse_transcript(self, transcript_path):
-        """
-        :param transcript_path: Path where transcript is stored from the manifest file
-        :return: Transcript in training/testing format
-        """
-        raise NotImplementedError
-
-    def parse_audio(self, audio_path):
-        """
-        :param audio_path: Path where audio is stored from the manifest file
-        :return: Audio in training/testing format
-        """
-        raise NotImplementedError
+def _default_loader(path):
+    utt, _ = librosa.load(path, sr=16000)
+    return utt
 
 
-class SpectrogramParser(AudioParser):
-    def __init__(self, audio_conf, normalize=False):
-        """
-        Parses audio file into spectrogram with optional normalization
-        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
-        :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
-        """
-        super(SpectrogramParser, self).__init__()
-        self.window_stride = audio_conf['window_stride']
-        self.window_size = audio_conf['window_size']
-        self.sample_rate = audio_conf['sample_rate']
-        self.window = windows.get(audio_conf['window'], windows['hamming'])
-        self.normalize = normalize
+# pylint: disable=R0903
+class TranscriptionDataset(torch.utils.data.Dataset):
+    """Dataset for transcription tasks."""
 
-    def parse_audio(self, audio_path):
-        y, _ = librosa.core.load(audio_path, sr=self.sample_rate)
-        n_fft = int(self.sample_rate * self.window_size)
-        win_length = n_fft
-        hop_length = int(self.sample_rate * self.window_stride)
-        # STFT
-        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length, window=self.window)
-        spect, phase = librosa.magphase(D)
-        # S = log(S+1)
-        spect = np.log1p(spect)
-        spect = torch.FloatTensor(spect)
-        if self.normalize:
-            mean = spect.mean()
-            std = spect.std()
-            spect.add_(-mean)
-            spect.div_(std)
+    def __init__(self, utts,
+                 transform=None,
+                 target_transform=None,
+                 loader=_default_loader):
 
-        return spect
-
-    def parse_transcript(self, transcript_path):
-        raise NotImplementedError
-
-
-class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, labels, manifest_filepath=None, normalize=False, ids=None):
-        """
-        Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
-        a comma. Each new line is a different sample. Example below:
-
-        /path/to/audio.wav,/path/to/audio.txt
-        ...
-
-        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
-        :param labels: String containing all the possible characters to map to
-        :param manifest_filepath: Path to manifest csv as describe above
-        :param normalize: Apply standard mean and deviation normalization to audio tensor
-        :param ids: Optionally give the ids loaded into a list (this will override parsing of the manifest csv)
-        """
-        super(SpectrogramDataset, self).__init__(audio_conf, normalize)
-        if not ids:
-            with open(manifest_filepath) as f:
-                ids = f.readlines()
-            ids = [x.strip().split(',') for x in ids]
-        self.ids = ids
-        self.size = len(ids)
-        self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
+        self.utts = utts
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = loader
 
     def __getitem__(self, index):
-        sample = self.ids[index]
-        audio_path, transcript_path = sample[0], sample[1]
-        spect = self.parse_audio(audio_path)
-        transcript = self.parse_transcript(transcript_path)
-        return spect, transcript
+        path, target = self.utts[index]
+        utt = self.loader(path)
+        if self.transform is not None:
+            utt = self.transform(utt)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
 
-    def parse_transcript(self, transcript_path):
-        with open(transcript_path, 'r') as transcript_file:
-            transcript = transcript_file.read().replace('\n', '')
-        transcript = [self.labels_map[x] for x in list(transcript)]
-        return transcript
+        return utt, target
 
     def __len__(self):
-        return self.size
+        return len(self.utts)
 
 
-def _collate_fn(batch):
-    def func(p):
-        return p[0].size(1)
+# pylint: disable=R0903
+class TarDataset(object):
+    """An abstract class representing a dataset from a tarball.
 
-    longest_sample = max(batch, key=func)[0]
-    freq_size = longest_sample.size(0)
-    minibatch_size = len(batch)
-    max_seqlength = longest_sample.size(1)
-    inputs = torch.zeros(minibatch_size, 1, freq_size, max_seqlength)
-    input_percentages = torch.FloatTensor(minibatch_size)
-    target_sizes = torch.IntTensor(minibatch_size)
-    targets = []
-    for x in range(minibatch_size):
-        sample = batch[x]
-        tensor = sample[0]
-        target = sample[1]
-        seq_length = tensor.size(1)
-        inputs[x][0].narrow(1, 0, seq_length).copy_(tensor)
-        input_percentages[x] = seq_length / float(max_seqlength)
-        target_sizes[x] = len(target)
-        targets.extend(target)
-    targets = torch.IntTensor(targets)
-    return inputs, targets, input_percentages, target_sizes
+    Attributes:
+        url: URL where the tar or tar.gz archive can be downloaded.
+        filename: Filename of the downloaded tarball.
+        dirname: Name of the top-level directory within the tarball
+            that contains the data files.
+    """
+    dirname = None
+    filename = None
+    url = None
 
+    @classmethod
+    def download_or_untar(cls, root):
+        """Downloads and untars the tarball located at `url` to the
+        directory specified by `root`"""
+        import tarfile
+        from six.moves import urllib
 
-class AudioDataLoader(DataLoader):
-    def __init__(self, *args, **kwargs):
-        """
-        Creates a data loader for AudioDatasets.
-        """
-        super(AudioDataLoader, self).__init__(*args, **kwargs)
-        self.collate_fn = _collate_fn
+        path = os.path.join(root, cls.dirname)
+        if not os.path.isdir(path):
+            tpath = os.path.join(root, cls.filename)
+            if not os.path.isfile(tpath):
+                print('Downloading {cls.url}'.format(cls=cls))
+                with open(tpath, 'wb') as tfile:
+                    tdata = urllib.request.urlopen(cls.url)
+                    tfile.write(tdata.read())
+            print('Extracting {cls.filename} to {cls.dirname}'.format(cls=cls))
+            with tarfile.open(tpath, 'r') as tfile:
+                tfile.extractall(path=root)
+            print('Removing {cls.filename}'.format(cls=cls))
+            os.unlink(tpath)
+        return os.path.join(path, '')
