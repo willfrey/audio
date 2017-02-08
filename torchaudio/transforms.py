@@ -2,6 +2,7 @@
 from __future__ import division
 
 import types
+from functools import wraps
 
 import librosa
 import numpy as np
@@ -51,7 +52,23 @@ class ToArray(object):
         return tensor.numpy()
 
 
-class _Structure(object):
+# class _FunctionFaker(object):
+#
+#     def __init__(self, func):
+#         wraps(func)(self)
+#
+#     def __call__(self, *args, **kwargs):
+#         # pylint: disable=E1101
+#         return self.__wrapped__(*args, **kwargs)
+#
+#     def __get__(self, instance, cls):
+#         if instance is None:
+#             return self
+#         else:
+#             return types.MethodType(self, instance)
+
+
+class _FuncArgsHandler(object):
     # Class variable that specifies expected fields
     _fields = []
 
@@ -71,7 +88,7 @@ class _Structure(object):
             raise TypeError('Duplicate values for {}'.format(','.join(kwargs)))
 
 
-class Resample(_Structure):
+class Resample(_FuncArgsHandler):
     _fields = ['orig_sr', 'targ_sr']
 
     def __doc__(self):
@@ -81,39 +98,39 @@ class Resample(_Structure):
         return librosa.resample(signal, **self.__dict__)
 
 
-class STFT(_Structure):
+class STFT(_FuncArgsHandler):
 
     def __call__(self, signal):
         return librosa.stft(signal, **self.__dict__)
 
 
-class PowerSpectrogram(_Structure):
+class PowerSpectrogram(_FuncArgsHandler):
 
     def __call__(self, stft_matrix):
         return np.abs(stft_matrix)**2
 
 
-class SpectLogAmplitude(_Structure):
+class LogAmplitude(_FuncArgsHandler):
 
     def __call__(self, spect):
         return librosa.logamplitude(spect, **self.__dict__)
 
 
-class MelSpectrogram(_Structure):
+class MelSpectrogram(_FuncArgsHandler):
     # pylint: disable=C0103
 
     def __call__(self, y=None, S=None):
         return librosa.feature.melspectrogram(y=y, S=S, **self.__dict__)
 
 
-class MFCC(_Structure):
+class MFCC(_FuncArgsHandler):
     # pylint: disable=C0103
 
     def __call__(self, y=None, S=None):
         return librosa.feature.mfcc(y=y, S=S, **self.__dict__)
 
 
-class Frame(_Structure):
+class Frame(_FuncArgsHandler):
 
     def __call__(self, signal):
         return librosa.util.frame(signal, **self.__dict__)
