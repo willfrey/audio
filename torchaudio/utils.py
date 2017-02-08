@@ -5,26 +5,6 @@ import fnmatch
 import glob
 import os
 
-
-def get_files(directory, pattern, recursive=True):
-    """ Return the full path to all files in directory matching the specified
-    pattern.
-    pattern should be a glob style pattern (e.g. "*.wav")
-    """
-    # This yields an iterator which really speeds up looking through
-    # large, flat directories.
-    if recursive is False:
-        matches_iter = glob.iglob(os.path.join(directory, pattern))
-        return matches_iter
-    # If we want to recurse, use os.walk instead
-    matches = list()
-    for root, _, filenames in os.walk(directory):
-        # pylint: disable=W0640
-        matches.extend(map(lambda ss: os.path.join(root, ss),
-                           fnmatch.filter(filenames, pattern)))
-    return matches
-
-#
 # def _update_progress(progress):
 #     print("\rProgress: [{0:50s}] {1:.1f}%".format('#' * int(progress * 50),
 #                                                   progress * 100), end="")
