@@ -27,8 +27,8 @@ class TranscriptionDataset(torch.utils.data.Dataset):
         self.target_transform = target_transform
         self.loader = loader
 
-    def __getitem__(self, index):
-        path, target = self.utts[index]
+    def __getitem__(self, key):
+        path, target = self.utts[key]
         utt = self.loader(path)
         if self.transform is not None:
             utt = self.transform(utt)
