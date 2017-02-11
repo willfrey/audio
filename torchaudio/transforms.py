@@ -378,12 +378,14 @@ class InjectNoise(Transform):
         # pylint: disable=E1101
         success = np.random.binomial(1, self.probability)
         if success:
-            noise_src = librosa.load(np.random.choice(self.paths), sr=self.sr)
-            noise_dst = np.zeros_like(data)
+            noise_src, _ = librosa.load(
+                np.random.choice(self.paths), sr=self.sr)
             noise_offset_fraction = np.random.rand()
             noise_level = np.random.uniform(*self.noise_levels)
 
-            src_offset = len(noise_src) * noise_offset_fraction
+            noise_dst = np.zeros_like(data)
+
+            src_offset = int(len(noise_src) * noise_offset_fraction)
             src_left = len(noise_src) - src_offset
 
             dst_offset = 0
@@ -401,9 +403,12 @@ class InjectNoise(Transform):
                     src_left = len(noise_src)
                     src_offset = 0
 
-        data += noise_level * noise_dst
+            data += noise_level * noise_dst
 
         return data
+
+    def __getitem__(self, index):
+        return self.paths[index]
 
 
 class SwapSamples(Transform):
