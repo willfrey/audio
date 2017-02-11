@@ -1,2 +1,4 @@
 librosa
 torch
+pysndfx
+six

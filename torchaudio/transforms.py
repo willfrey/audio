@@ -8,13 +8,14 @@ import numpy as np
 import torch
 
 
-# pylint: disable=R0903, C0111
+# pylint: disable=R0903
+
 
 ##################
 # Helper Classes #
 ##################
 
-class _Structure(object):
+class _ArgHandler(object):
     # Class variable that specifies expected fields
     _fields = []
 
@@ -126,7 +127,7 @@ class Lambda(Transform):
 # Audio-oriented transforms #
 #############################
 
-class Resample(_Structure, Transform):
+class Resample(_ArgHandler, Transform):
     """Resample a time series from orig_sr to target_sr
 
        Attributes
@@ -185,8 +186,10 @@ class Resample(_Structure, Transform):
         """
         return librosa.resample(y, **self.__dict__)
 
+# Feature
 
-class STFT(_Structure, Transform):
+
+class STFT(_ArgHandler, Transform):
     """Short-time Fourier transform (STFT)
 
     Attributes
@@ -244,28 +247,31 @@ class STFT(_Structure, Transform):
         return librosa.stft(y, **self.__dict__)
 
 
-class PowerSpectrogram(_Structure, Compose):
+class PowerSpectrogram(_ArgHandler, Compose):
     """Computes the power spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # pylint: disable=E1101
+
         self.transforms = [STFT(*args, **kwargs),
+                           # pylint: disable=E1101
                            Lambda(lambda S: np.square(np.abs(S)))]
-        # pylint: enable=E1101
 
     def __call__(self, y):
         return super().__call__(y)
 
 
-class LogAmplitude(_Structure, Transform):
-    """Returns the log-scaled amplitude of a spectrogram."""
+class LogAmplitude(_ArgHandler, Transform):
+    """Returns the log-scaled amplitude of a spectrogram.
+
+    This is used in LogPowerSpectrogram and LogMelSpectrogram.
+    """
 
     def __call__(self, S):
         return librosa.logamplitude(S, **self.__dict__)
 
 
-class LogPowerSpectrogram(_Structure, Compose):
+class LogPowerSpectrogram(_ArgHandler, Compose):
     """Computes the log-power spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
@@ -276,14 +282,14 @@ class LogPowerSpectrogram(_Structure, Compose):
         ]
 
 
-class MelSpectrogram(_Structure):
+class MelSpectrogram(_ArgHandler, Transform):
     """Computes the Mel-scaled power spectrogram of an input signal."""
 
     def __call__(self, data):
         return librosa.feature.melspectrogram(y=data, **self.__dict__)
 
 
-class LogMelSpectrogram(_Structure, Compose):
+class LogMelSpectrogram(_ArgHandler, Compose):
     """Computes the log-power Mel spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
@@ -294,14 +300,14 @@ class LogMelSpectrogram(_Structure, Compose):
         ]
 
 
-class MFCC(_Structure, Transform):
+class MFCC(_ArgHandler, Transform):
     """Computes the mel-frequency cepstral coefficients of an input signal."""
 
     def __call__(self, y):
         return librosa.feature.mfcc(y, **self.__dict__)
 
 
-class StackMemory(_Structure, Transform):
+class StackMemory(_ArgHandler, Transform):
     """Short-term history embedding.
 
     Vertically concatenate a data vector or matrix with delayed
@@ -312,23 +318,124 @@ class StackMemory(_Structure, Transform):
         return librosa.feature.stack_memory(data, **self.__dict__)
 
 
-class Delta(_Structure, Transform):
-    _fields = ['']
+class Delta(_ArgHandler, Transform):
     """Compute delta features."""
 
     def __call__(self, data):
         raise NotImplementedError
 
 
+class TimeWarp(Transform):
+    """Time-stretch an audio series by a fixed rate with some probability.
 
-class InjectNoise(_Structure, Transform):
-    """Adds noise to an input signal with some probability and some SNR."""
+    The rate is selected randomly from between two values.
+
+    It's just a jump to the left...
+    """
+
+    def __init__(self, rates=(1.0, 1.0), probability=0.0):
+        self.rates = rates
+        self.probability = probability
+
+    def __call__(self, data):
+        # pylint: disable=E1101
+        success = np.random.binomial(1, self.probability)
+        if success:
+            rate = np.random.uniform(*self.rates)
+            return librosa.effects.time_stretch(data, rate)
+        return data
+
+
+class PitchShift(Transform):
+    """Pitch-shift the waveform by n_steps half-steps."""
+    _fields = ['sr', 'n_steps']
+
+    def __call__(self, data):
+        return librosa.effects.pitch_shift(data, **self.__dict__)
+
+
+# pylint: disable=C0103, R0913
+class InjectNoise(Transform):
+    """Adds noise to an input signal with some probability and some SNR.
+
+    Only adds a single noise file from the list right now.
+    """
+
+    def __init__(self, paths=None,
+                 path=None,
+                 sr=16000,
+                 noise_levels=(0, 0.5),
+                 probability=0.4):
+        if path:
+            self.paths = librosa.util.find_files(path)
+        else:
+            self.paths = paths
+        self.sr = sr
+        self.noise_levels = noise_levels
+        self.probability = probability
+
+    def __call__(self, data):
+        # pylint: disable=E1101
+        success = np.random.binomial(1, self.probability)
+        if success:
+            noise_src = librosa.load(np.random.choice(self.paths), sr=self.sr)
+            noise_dst = np.zeros_like(data)
+            noise_offset_fraction = np.random.rand()
+            noise_level = np.random.uniform(*self.noise_levels)
+
+            src_offset = len(noise_src) * noise_offset_fraction
+            src_left = len(noise_src) - src_offset
+
+            dst_offset = 0
+            dst_left = len(data)
+
+            while dst_left > 0:
+                copy_size = min(dst_left, src_left)
+                np.copyto(noise_dst[dst_offset:dst_offset + copy_size],
+                          noise_src[src_offset:src_offset + copy_size])
+                if src_left > dst_left:
+                    dst_left = 0
+                else:
+                    dst_left -= copy_size
+                    dst_offset += copy_size
+                    src_left = len(noise_src)
+                    src_offset = 0
+
+        data += noise_level * noise_dst
+
+        return data
+
+
+class SwapSamples(Transform):
+    """Intentionally corrupts an audio file by swapping adjacent samples.
+
+    Iterates over each sample (excluding the boundary) of the input
+    signal and will stochastically swap the sample with its neighbor.
+    Whether the neighbor is the left or right sample is chosen randomly
+    with equal probability.
+
+    """
+
+    def __init__(self, probability):
+        self.probability = probability
+
+    def __call__(self, data):
+        # Vectorize this?
+        for i in range(1, len(data) - 1):
+            # pylint: disable=E1101
+            success = np.random.binomial(1, self.probability)
+            if success:
+                swap_right = np.random.binomial(1, 0.5)
+                if swap_right:
+                    data[i], data[i + 1] = data[i + 1], data[i]
+                else:
+                    data[i], data[i - 1] = data[i - 1], data[i]
+        return data
 
 
 ############################
 # Text-Oriented Transforms #
 ############################
-
 
 class CharToInt(Transform):
     """Maps a string or other iterable, character-wise, to integer labels.

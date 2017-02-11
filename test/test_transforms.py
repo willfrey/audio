@@ -1,9 +1,6 @@
 """Unit tests for torchaudio.transforms."""
 
-import random
 import unittest
-
-import torch
 
 import torchaudio.transforms
 

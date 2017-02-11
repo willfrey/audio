@@ -9,7 +9,8 @@ VERSION = '0.1.0'
 requirements = [
     'librosa',
     'six',
-    'torch'
+    'torch',
+    'pysndfx'
 ]
 
 setup(
