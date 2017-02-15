@@ -4,13 +4,9 @@ from __future__ import print_function
 import os
 import os.path
 
-import librosa
 import torch.utils.data
 
-
-def _default_loader(path):
-    utt, _ = librosa.load(path, sr=16000)
-    return utt
+import torchaudio.utils
 
 
 # pylint: disable=R0903
@@ -20,7 +16,7 @@ class TranscriptionDataset(torch.utils.data.Dataset):
     def __init__(self, utts,
                  transform=None,
                  target_transform=None,
-                 loader=_default_loader):
+                 loader=torchaudio.utils.load_audio):
 
         self.utts = utts
         self.transform = transform
@@ -29,7 +25,7 @@ class TranscriptionDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, key):
         path, target = self.utts[key]
-        utt = self.loader(path)
+        utt, _ = self.loader(path)
         if self.transform is not None:
             utt = self.transform(utt)
         if self.target_transform is not None:

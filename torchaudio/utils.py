@@ -1,9 +1,15 @@
 """Utilities for torchaudio."""
 from __future__ import print_function
 
-import fnmatch
-import glob
-import os
+import librosa
+import soundfile as sf
+
+
+def load_audio(path, target_sr=16000):
+    data, orig_sr = sf.read(path)
+    if orig_sr != target_sr:
+        return librosa.resample(data, orig_sr, target_sr)
+    return data
 
 # def _update_progress(progress):
 #     print("\rProgress: [{0:50s}] {1:.1f}%".format('#' * int(progress * 50),

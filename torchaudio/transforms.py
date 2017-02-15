@@ -65,28 +65,22 @@ class Compose(Transform):
         transforms: A list of Transforms to apply sequentially.
     """
 
-    def __init__(self, transforms, *args):
+    def __init__(self, transforms):
         """Inits Compose with the specified transforms.
 
         Args:
-            transforms: A transform or iterable of transforms to apply.
-            args: Additional transforms to append to the pipeline.
+            transforms: Any iterable of transforms.
         """
-        self.transforms = []
-        for item in (transforms, *args):
-            try:
-                self.transforms.extend(item)
-            except TypeError:
-                self.transforms.append(item)
+        self._transforms = list(transforms)
 
     def __len__(self):
-        return len(self.transforms)
+        return len(self._transforms)
 
-    def __getitem__(self, key):
-        return self.transforms[key]
+    def __getitem__(self, index):
+        return self._transforms[index]
 
     def __call__(self, data):
-        for transform in self.transforms:
+        for transform in self._transforms:
             data = transform(data)
         return data
 
@@ -94,9 +88,9 @@ class Compose(Transform):
 class ToTensor(Transform):
     """Converts a numpy.ndarray to a torch.*Tensor."""
 
-    def __call__(self, array):
+    def __call__(self, nparray):
         # pylint: disable=E1101
-        return torch.from_numpy(array)
+        return torch.from_numpy(nparray)
         # pylint: enable=E1101
 
 
@@ -252,13 +246,12 @@ class PowerSpectrogram(_ArgHandler, Compose):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._transforms = [STFT(*args, **kwargs),
+                            # pylint: disable=E1101
+                            Lambda(lambda S: np.square(np.abs(S)))]
 
-        self.transforms = [STFT(*args, **kwargs),
-                           # pylint: disable=E1101
-                           Lambda(lambda S: np.square(np.abs(S)))]
-
-    def __call__(self, y):
-        return super().__call__(y)
+    # def __call__(self, y):
+        # return super().__call__(y)
 
 
 class LogAmplitude(_ArgHandler, Transform):
@@ -276,17 +269,20 @@ class LogPowerSpectrogram(_ArgHandler, Compose):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.transforms = [
+        self._transforms = [
             PowerSpectrogram(*args, **kwargs),
             LogAmplitude(*args, **kwargs)
         ]
+
+    # def __call__(self, y):
+        # return super().__call__(y)
 
 
 class MelSpectrogram(_ArgHandler, Transform):
     """Computes the Mel-scaled power spectrogram of an input signal."""
 
-    def __call__(self, data):
-        return librosa.feature.melspectrogram(y=data, **self.__dict__)
+    def __call__(self, y):
+        return librosa.feature.melspectrogram(y=y, **self.__dict__)
 
 
 class LogMelSpectrogram(_ArgHandler, Compose):
@@ -294,7 +290,7 @@ class LogMelSpectrogram(_ArgHandler, Compose):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.transforms = [
+        self._transforms = [
             MelSpectrogram(*args, **kwargs),
             LogAmplitude(*args, **kwargs)
         ]
@@ -318,13 +314,6 @@ class StackMemory(_ArgHandler, Transform):
         return librosa.feature.stack_memory(data, **self.__dict__)
 
 
-class Delta(_ArgHandler, Transform):
-    """Compute delta features."""
-
-    def __call__(self, data):
-        raise NotImplementedError
-
-
 class TimeWarp(Transform):
     """Time-stretch an audio series by a fixed rate with some probability.
 
@@ -337,21 +326,21 @@ class TimeWarp(Transform):
         self.rates = rates
         self.probability = probability
 
-    def __call__(self, data):
+    def __call__(self, y):
         # pylint: disable=E1101
         success = np.random.binomial(1, self.probability)
         if success:
             rate = np.random.uniform(*self.rates)
-            return librosa.effects.time_stretch(data, rate)
-        return data
+            return librosa.effects.time_stretch(y, rate)
+        return y
 
 
 class PitchShift(Transform):
     """Pitch-shift the waveform by n_steps half-steps."""
     _fields = ['sr', 'n_steps']
 
-    def __call__(self, data):
-        return librosa.effects.pitch_shift(data, **self.__dict__)
+    def __call__(self, y):
+        return librosa.effects.pitch_shift(y, **self.__dict__)
 
 
 # pylint: disable=C0103, R0913
@@ -361,8 +350,9 @@ class InjectNoise(Transform):
     Only adds a single noise file from the list right now.
     """
 
-    def __init__(self, paths=None,
+    def __init__(self,
                  path=None,
+                 paths=None,
                  sr=16000,
                  noise_levels=(0, 0.5),
                  probability=0.4):
@@ -412,30 +402,51 @@ class InjectNoise(Transform):
 
 
 class SwapSamples(Transform):
-    """Intentionally corrupts an audio file by swapping adjacent samples.
+    """Intentionally corrupts mono audio by swapping adjacent samples.
 
     Iterates over each sample (excluding the boundary) of the input
     signal and will stochastically swap the sample with its neighbor.
     Whether the neighbor is the left or right sample is chosen randomly
     with equal probability.
-
     """
 
     def __init__(self, probability):
         self.probability = probability
 
-    def __call__(self, data):
+    def __call__(self, y):
         # Vectorize this?
-        for i in range(1, len(data) - 1):
+        for i in range(1, len(y) - 1):
             # pylint: disable=E1101
             success = np.random.binomial(1, self.probability)
             if success:
                 swap_right = np.random.binomial(1, 0.5)
                 if swap_right:
-                    data[i], data[i + 1] = data[i + 1], data[i]
+                    y[i], y[i + 1] = y[i + 1], y[i]
                 else:
-                    data[i], data[i - 1] = data[i - 1], data[i]
-        return data
+                    y[i], y[i - 1] = y[i - 1], y[i]
+        return y
+
+
+class TimeShift(Transform):
+    """Stochastically shifts audio samples."""
+
+    def __init__(self, probability, min_max_displacement=(80, 81)):
+        self.probability = probability
+        self.min_max_displacement = min_max_displacement
+
+    def __call__(self, y):
+        # pylint: disable=E1101
+        success = np.random.binomial(1, self.probability)
+        if success:
+            shift = np.random.randint(*self.min_max_displacement)
+            if np.random.binomial(1, 0.5):  # shift to the right
+                y[shift:] = y[:-shift]
+                y[:shift] = 0
+            else:
+                y[:-shift] = y[shift:]
+                y[-shift:] = 0
+
+        return y
 
 
 ############################
