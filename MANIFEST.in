@@ -3,4 +3,4 @@ include LICENSE
 include README.md
 
 # Include the data files
-recursive-include data *
+# recursive-include data *
