@@ -1,3 +1,4 @@
 librosa
 pysoundfile
+scipy
 six
