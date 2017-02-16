@@ -11,7 +11,7 @@ with codecs.open(os.path.join(HERE, 'README.md'), encoding='utf-8') as file:
 
 VERSION = '0.1.0'
 
-REQUIREMENTS = ['librosa', 'pysoundfile', 'scipy', 'six']
+REQUIREMENTS = ['six', 'scipy', 'librosa', 'pysoundfile']
 
 AUTHOR_EMAIL = ', '.join(
     ['will.frey@digitalreasoning.com',

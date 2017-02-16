@@ -1,4 +1,4 @@
-librosa
-pysoundfile
-scipy
 six
+scipy
+pysoundfile
+librosa
