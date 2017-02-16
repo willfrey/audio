@@ -1,4 +1,4 @@
-sklean
+sklearn
 librosa
 pysoundfile
 six
