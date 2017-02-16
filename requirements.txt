@@ -1,5 +1,4 @@
-sklearn
 librosa
 pysoundfile
 six
-scipy
+torch
