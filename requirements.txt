@@ -2,4 +2,3 @@ librosa
 pysoundfile
 six
 scipy
-torch
