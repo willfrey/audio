@@ -4,9 +4,22 @@ python:
   - "2.7"
   - "3.5"
   - "3.6"
+
+cache:
+  - ccache
+  - directories:
+      - $HOME/.ccache
+
 # command to install dependencies
 install:
-  - pip install -r requirements.txt
+  - unset CCACHE_DISABLE
+  - export CCACHE_DIR=$HOME/.ccache
+  - export CC="ccache gcc-4.8"
+  - export CXX="ccache g++-4.8"
+  - ccache --show-stats
+  - travis_retry pip install -r requirements.txt
+  - python setup.py install
+  # - pip install -r requirements.txt
   - pip install tox-travis
 # command to run tests
 script: tox
