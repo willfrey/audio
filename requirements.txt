@@ -1,4 +1,5 @@
 librosa
+numpy
 pysoundfile
-torch
 six
+torch
