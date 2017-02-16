@@ -1,4 +1,5 @@
+librosa
+pysoundfile
 six
 scipy
-pysoundfile
-librosa
+torch
