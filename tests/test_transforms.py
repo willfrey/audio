@@ -1,5 +1,13 @@
 """Unit tests for torchaudio.transforms."""
 
-import unittest
+from unittest import TestCase
 
-import torchaudio.transforms
+from torchaudio import transforms
+
+class TransformTest(TestCase):
+
+    def set_up(self):
+        self.transform = transforms.Transform()
+
+    def test_callable(self):
+        self.assertTrue(callable(self))

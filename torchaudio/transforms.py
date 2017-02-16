@@ -15,7 +15,7 @@ import torch
 # Helper Classes #
 ##################
 
-class _ArgHandler(object):
+class _Structure(object):
     # Class variable that specifies expected fields
     _fields = []
 
@@ -121,7 +121,7 @@ class Lambda(Transform):
 # Audio-oriented transforms #
 #############################
 
-class Resample(_ArgHandler, Transform):
+class Resample(_Structure, Transform):
     """Resample a time series from orig_sr to target_sr
 
        Attributes
@@ -183,7 +183,7 @@ class Resample(_ArgHandler, Transform):
 # Feature
 
 
-class STFT(_ArgHandler, Transform):
+class STFT(_Structure, Transform):
     """Short-time Fourier transform (STFT)
 
     Attributes
@@ -241,7 +241,7 @@ class STFT(_ArgHandler, Transform):
         return librosa.stft(y, **self.__dict__)
 
 
-class PowerSpectrogram(_ArgHandler, Compose):
+class PowerSpectrogram(_Structure, Compose):
     """Computes the power spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
@@ -254,7 +254,7 @@ class PowerSpectrogram(_ArgHandler, Compose):
         # return super().__call__(y)
 
 
-class LogAmplitude(_ArgHandler, Transform):
+class LogAmplitude(_Structure, Transform):
     """Returns the log-scaled amplitude of a spectrogram.
 
     This is used in LogPowerSpectrogram and LogMelSpectrogram.
@@ -264,7 +264,7 @@ class LogAmplitude(_ArgHandler, Transform):
         return librosa.logamplitude(S, **self.__dict__)
 
 
-class LogPowerSpectrogram(_ArgHandler, Compose):
+class LogPowerSpectrogram(_Structure, Compose):
     """Computes the log-power spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
@@ -278,14 +278,14 @@ class LogPowerSpectrogram(_ArgHandler, Compose):
         # return super().__call__(y)
 
 
-class MelSpectrogram(_ArgHandler, Transform):
+class MelSpectrogram(_Structure, Transform):
     """Computes the Mel-scaled power spectrogram of an input signal."""
 
     def __call__(self, y):
         return librosa.feature.melspectrogram(y=y, **self.__dict__)
 
 
-class LogMelSpectrogram(_ArgHandler, Compose):
+class LogMelSpectrogram(_Structure, Compose):
     """Computes the log-power Mel spectrogram of an input signal."""
 
     def __init__(self, *args, **kwargs):
@@ -296,14 +296,14 @@ class LogMelSpectrogram(_ArgHandler, Compose):
         ]
 
 
-class MFCC(_ArgHandler, Transform):
+class MFCC(_Structure, Transform):
     """Computes the mel-frequency cepstral coefficients of an input signal."""
 
     def __call__(self, y):
         return librosa.feature.mfcc(y, **self.__dict__)
 
 
-class StackMemory(_ArgHandler, Transform):
+class StackMemory(_Structure, Transform):
     """Short-term history embedding.
 
     Vertically concatenate a data vector or matrix with delayed
