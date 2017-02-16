@@ -1,5 +1,3 @@
 librosa
-numpy
 pysoundfile
 six
-torch
