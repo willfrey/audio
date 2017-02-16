@@ -1,33 +1,29 @@
 #!/usr/bin/env python
+import codecs
+import os.path
+
 from setuptools import find_packages, setup
 
-README = open('README.md').read()
+HERE = os.path.abspath(os.path.dirname(__file__))
+
+with codecs.open(os.path.join(HERE, 'README.md'), encoding='utf-8') as file:
+    LONG_DESCRIPTION = file.read()
 
 VERSION = '0.1.0'
 
-# same as ./requirements.txt
-REQUIREMENTS = [
-    'librosa',
-    'pysoundfile',
-    'six',
-    'torch',
-]
+REQUIREMENTS = ['librosa', 'pysoundfile', 'six', 'torch']
 
 setup(
-    # Metadata
     name='torchaudio',
     version=VERSION,
-    author='Will Frey, Sean Narenthiran',
+    description='audio utilities and datasets for torch deep learning',
+    long_description=LONG_DESCRIPTION,
+    url='https://github.com/willfrey/audio',
+    author='Will Frey and Sean Narenthiran',
     author_email=('will.frey@digitalreasoning.com, ',
                   ' sean.narenthiran@digitalreasoning.com'),
-    url='https://github.com/pytorch/audio',
-    description='audio utilities and datasets for torch deep learning',
-    long_description=README,
     license='BSD',
-
-    # Package info
-    packages=find_packages(exclude=('test',)),
-
-    zip_safe=True,
+    packages=find_packages(exclude=['tests']),
     install_requires=REQUIREMENTS,
+    zip_safe=True
 )
