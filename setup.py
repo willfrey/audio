@@ -13,6 +13,11 @@ VERSION = '0.1.0'
 
 REQUIREMENTS = ['librosa', 'pysoundfile', 'scipy', 'six']
 
+AUTHOR_EMAIL = ', '.join(
+    ['will.frey@digitalreasoning.com',
+     'sean.narenthiran@digitalreasoning.com']
+)
+
 setup(
     name='torchaudio',
     version=VERSION,
@@ -20,8 +25,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     url='https://github.com/willfrey/audio',
     author='Will Frey and Sean Narenthiran',
-    author_email=('will.frey@digitalreasoning.com, ',
-                  ' sean.narenthiran@digitalreasoning.com'),
+    author_email=AUTHOR_EMAIL,
     license='BSD',
     packages=find_packages(exclude=['tests']),
     install_requires=REQUIREMENTS,
